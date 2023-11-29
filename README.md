@@ -19,13 +19,13 @@ from shapinteractions import ShapInteractions
 
 ### How to use the package?
 
-You'll find an [example_notebook.ipynb](example_notebook.ipynb) where everything is explained.
+You'll find an [example_notebook.ipynb](examples/example_notebook.ipynb) where everything is explained.
 
 ### How to read the graph?
 
-You can open the [example HTML graph](example_graph.html) directly in a web browser to interact with it.
+You can open the [examples/example_graph.html](examples/example_graph.html) directly in a web browser to interact with it.
 
-![Graph example](example_graph.png)
+![Graph example](examples/example_graph.png)
 
 Each **feature** is represented by a **node**:
 - its color informs about whether the feature is positively correlated (red) or negatively correlated (blue) with the model predictions
