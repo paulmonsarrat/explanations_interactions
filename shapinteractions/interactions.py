@@ -168,7 +168,7 @@ class ShapInteractions:
         return interaction_matrix
     
 
-    def create_graph(self, filename='interaction_graph.html', spearmans_threshold=0.3):
+    def create_graph(self, filename='interaction_graph.html', spearmans_threshold=0.3, max_arrows=200):
         """
         Builds the interaction graph and saves it to the specified HTML file.
 
@@ -179,8 +179,8 @@ class ShapInteractions:
         """
 
         if np.all(self.spearmans==0) or np.all(self.pearsons==0):
-            self.compute_trend_coefs()
             print("This step will be ignored next time (if already computed coefficients are found)")
+            self.compute_trend_coefs()
 
 
         self.edges_data = []
@@ -191,7 +191,19 @@ class ShapInteractions:
 
         np.fill_diagonal(mean_shap_interactions_no_diag, np.NINF)
 
-        mean_shap_interactions_norm = (mean_shap_interactions - 0.05) / (mean_shap_interactions_no_diag.max() - 0.05)
+        pairs = []
+
+        for i in range(len(self.feature_names)):
+            for j in range(i+1, len(self.feature_names)):
+                value = mean_shap_interactions_no_diag[i][j]
+                pairs.append((value, i, j))
+        
+        pairs.sort(reverse=True, key=lambda x: x[0])
+
+        top_pairs = pairs[:max_arrows//2]
+        min_val = top_pairs[-1][0]
+
+        mean_shap_interactions_norm = (mean_shap_interactions - min_val) / (mean_shap_interactions_no_diag.max() - min_val)
 
         shadow_dict = {
             "enabled": True,
@@ -204,65 +216,67 @@ class ShapInteractions:
         net = Network(notebook=True, cdn_resources='in_line', directed=True)
 
         for i in range(len(self.feature_names)):
-            for j in range(len(self.feature_names)):
-                if i == j:
-                    if np.sign(self.spearmans[i,i]) != np.sign(self.pearsons[i,i]) or abs(self.spearmans[i,i])<spearmans_threshold:
-                        bg = 'black'
-                        bg_h = 'lightgrey'
-                    else:
-                        bg = '#fa3c62' if self.spearmans[i,i]>0 else '#3c8efa'
-                        bg_h = '#fa6180' if self.spearmans[i,i]>0 else '#90bcf5'
+            if np.sign(self.spearmans[i,i]) != np.sign(self.pearsons[i,i]) or abs(self.spearmans[i,i])<spearmans_threshold:
+                bg = 'black'
+                bg_h = 'lightgrey'
+            else:
+                bg = '#fa3c62' if self.spearmans[i,i]>0 else '#3c8efa'
+                bg_h = '#fa6180' if self.spearmans[i,i]>0 else '#90bcf5'
 
-                    main_title = (
-                        f"{self.feature_names[i]}\n"
-                        f"Pearson's r: {round(self.pearsons[i,i],2)}\n"
-                        f"Spearman's r: {round(self.spearmans[i,i],2)}\n"
-                        f"Mean absolute SHAP: {str(round(mean_shap_interactions[i,i],2))}"
-                    )
+            main_title = (
+                f"{self.feature_names[i]}\n"
+                f"Pearson's r: {round(self.pearsons[i,i],2)}\n"
+                f"Spearman's r: {round(self.spearmans[i,i],2)}\n"
+                f"Mean absolute SHAP: {str(round(mean_shap_interactions[i,i],2))}"
+            )
 
-                    net.add_node(
-                        self.feature_names[i],
-                        size=max(2, 10*round(float(mean_shap_interactions_norm[i][i]/4))),
-                        color={
-                            'background': bg,
-                            'border': 'black',
-                            'highlight': {
-                                'background': bg_h,
-                                'border': 'black'
-                            }
-                        },
-                        shadow=shadow_dict,
-                        title=main_title
-                    )
-
-                elif mean_shap_interactions[i][j]>=0.05:                    
-                    if np.sign(self.spearmans[i,j]) != np.sign(self.pearsons[i,j]):
-                        edge_color = 'black'
-                    else:
-                        edge_color = "#3c8efa" if self.spearmans[i][j] < 0 else "#fa3c62"
-
-                    dashes = 1 if abs(self.spearmans[i,j]) < spearmans_threshold else 0
-
-                    edge_title = (
-                        f"{self.feature_names[i]} --> {self.feature_names[j]}\n"
-                        f"Pearson's r: {round(self.pearsons[i,j],2)}\n"
-                        f"Spearman's r: {round(self.spearmans[i,j],2)}\n"
-                        f"Mean absolute SHAP: {str(round(mean_shap_interactions[i,j],2))}"
-                    )
-
-                    edge = {
-                        'from': self.feature_names[i],
-                        'to': self.feature_names[j],
-                        'weight': mean_shap_interactions_norm[i][j],
-                        'color': edge_color,
-                        'title': edge_title,
-                        'dashes': dashes
+            net.add_node(
+                self.feature_names[i],
+                size=max(2, 10*round(float(mean_shap_interactions_norm[i][i]/4))),
+                color={
+                    'background': bg,
+                    'border': 'black',
+                    'highlight': {
+                        'background': bg_h,
+                        'border': 'black'
                     }
+                },
+                shadow=shadow_dict,
+                title=main_title
+            )
 
-                    self.edges_data.append(edge)
+        for value, i, j in top_pairs:
+            ii, jj = i, j
+            for _ in range(2):               
+                if np.sign(self.spearmans[ii,jj]) != np.sign(self.pearsons[ii,jj]):
+                    edge_color = 'black'
+                else:
+                    edge_color = "#3c8efa" if self.spearmans[ii][jj] < 0 else "#fa3c62"
 
-                    if mean_shap_interactions_norm[i][j] > threshold:
-                        default_edges.append(edge)
+                dashes = 1 if abs(self.spearmans[ii,jj]) < spearmans_threshold else 0
+
+                edge_title = (
+                    f"{self.feature_names[ii]} --> {self.feature_names[jj]}\n"
+                    f"Pearson's r: {round(self.pearsons[ii,jj],2)}\n"
+                    f"Spearman's r: {round(self.spearmans[ii,jj],2)}\n"
+                    f"Mean absolute SHAP: {str(round(value,2))}"
+                )
+
+                edge = {
+                    'from': self.feature_names[ii],
+                    'to': self.feature_names[jj],
+                    'weight': mean_shap_interactions_norm[ii][jj],
+                    'color': edge_color,
+                    'title': edge_title,
+                    'dashes': dashes
+                }
+
+                self.edges_data.append(edge)
+
+                if mean_shap_interactions_norm[ii][jj] > threshold:
+                    default_edges.append(edge)
+                
+                ii, jj = j, i
 
         for edge in default_edges:
             net.add_edge(
