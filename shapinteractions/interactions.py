@@ -86,7 +86,7 @@ class ShapInteractions:
         m = shap_interactions.shape[1]
         n = shap_interactions.shape[0]
 
-        interaction_trends = shap_interactions * shap_interactions[:, np.arange(m), np.arange(m)].reshape(n, m, 1)
+        interaction_trends = shap_interactions * np.sign(shap_interactions[:, np.arange(m), np.arange(m)].reshape(n, m, 1))
 
         self.interaction_trends = np.transpose(interaction_trends, (0, 2, 1))
         self.pearsons = np.zeros((48,48))
